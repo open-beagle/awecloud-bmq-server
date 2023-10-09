@@ -7,7 +7,9 @@ const (
 	//APIServer前缀
 	APIPrefix = "/awecloud/bmq/api"
 	//APIServer的端口设置
-	APIPort = 8080
+	APIPort = 83
+	//GRPCServer的端口设置
+	GRPCPort = "81"
 )
 
 var (
@@ -27,4 +29,12 @@ type Config struct {
 	EtcdCert        string
 	EtcdCertKey     string
 	EtcdCa          string
+}
+
+var Message = &messageConfig{
+	Token: "bmq",
+}
+
+type messageConfig struct {
+	Token string
 }

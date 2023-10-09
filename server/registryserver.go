@@ -2,9 +2,26 @@ package server
 
 import (
 	"context"
+	"log"
+	"net"
 
 	"github.com/open-beagle/awecloud-bmq-sdk/pkg"
+	"github.com/open-beagle/awecloud-bmq-server/pkg/conf"
+	"google.golang.org/grpc"
 )
+
+func NewRegistryServer() {
+	lis, err := net.Listen("tcp", conf.GRPCPort)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	s := grpc.NewServer()
+	pkg.RegisterRegistryServer(s, &RegistryServer{})
+	log.Printf("grpc server listening at %v", lis.Addr())
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+}
 
 // RegistryServer is used to implement sdk.RegistryServer.
 type RegistryServer struct {
