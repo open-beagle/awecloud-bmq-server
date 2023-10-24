@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatedier/frp/pkg/config"
 	"github.com/fatedier/frp/server"
+
 	"github.com/open-beagle/awecloud-bmq-server/pkg/conf"
 )
 
@@ -25,5 +26,6 @@ func NewMessageServer() {
 func genDefaultConfig() (cfg config.ServerCommonConf) {
 	cfg = config.GetDefaultServerConf()
 	cfg.Token = conf.Message.Token
+	cfg.BindPort = conf.Message.Port
 	return cfg
 }

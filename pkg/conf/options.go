@@ -2,39 +2,42 @@ package conf
 
 import "go.uber.org/zap"
 
-// 基础配置
-const (
-	//APIServer前缀
-	APIPrefix = "/awecloud/bmq/api"
-	//APIServer的端口设置
-	APIPort = 83
-	//GRPCServer的端口设置
-	GRPCPort = "81"
-)
-
 var (
-	Options     *Config
 	Logger      *zap.Logger
 	LoggerLevel string
 	RunMode     string
+	Host        string
+	Port        int
 )
 
-// 公共配置
-type Config struct {
-	// ECTD
-	EtcdEndPoint    []string
-	EtcdEndUsername string
-	EtcdEndPassword string
-	EtcdTls         bool
-	EtcdCert        string
-	EtcdCertKey     string
-	EtcdCa          string
+type apiConfig struct {
+	Port   int
+	Prefix string
 }
 
-var Message = &messageConfig{
-	Token: "bmq",
+var API = &apiConfig{
+	Port:   83,
+	Prefix: "/awecloud/bmq/api",
+}
+
+type grpcConfig struct {
+	Port string
+}
+
+var GRPC = &grpcConfig{
+	Port: "81",
 }
 
 type messageConfig struct {
-	Token string
+	Port   int
+	Token  string
+	Prefix string
 }
+
+var Message = &messageConfig{
+	Port:   82,
+	Token:  "bmq",
+	Prefix: "/awecloud/bmq/message",
+}
+
+var Server = &ServerConfig{}

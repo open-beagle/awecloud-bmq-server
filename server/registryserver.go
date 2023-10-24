@@ -2,21 +2,28 @@ package server
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net"
+	"strconv"
+	"time"
+
+	"google.golang.org/grpc"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/open-beagle/awecloud-bmq-sdk/pkg"
 	"github.com/open-beagle/awecloud-bmq-server/pkg/conf"
-	"google.golang.org/grpc"
 )
 
 func NewRegistryServer() {
-	lis, err := net.Listen("tcp", conf.GRPCPort)
+	lis, err := net.Listen("tcp", conf.GRPC.Port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
-	pkg.RegisterRegistryServer(s, &RegistryServer{})
+	pkg.RegisterRegistryServer(s, &RegistryServer{
+		Workers: make([]registryWoker, 0),
+	})
 	log.Printf("grpc server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
@@ -26,34 +33,131 @@ func NewRegistryServer() {
 // RegistryServer is used to implement sdk.RegistryServer.
 type RegistryServer struct {
 	pkg.UnimplementedRegistryServer
-	ListenChan chan *pkg.ListenResponse
+	Workers []registryWoker
 }
 
 // Login implements sdk.RegistryServer.
 func (s *RegistryServer) Login(ctx context.Context, in *pkg.LoginRequest) (*pkg.LoginResponse, error) {
-	return nil, nil
+	if conf.Server != nil && len(conf.Server.Workers) > 0 {
+		for _, k := range conf.Server.Workers {
+			if k.ID == in.ID {
+				if k.Secret == in.Secret {
+					return &pkg.LoginResponse{
+						Path:   conf.Message.Prefix,
+						Secret: conf.Message.Token,
+					}, nil
+				} else {
+					return nil, errors.New("error : Secret mismatch")
+				}
+			}
+		}
+	}
+	return nil, errors.New("error : ID or Secret mismatch")
 }
 
 // Listen implements sdk.RegistryServer.
 func (s *RegistryServer) Listen(in *pkg.ListenRequest, stream pkg.Registry_ListenServer) error {
-	for {
-		res := <-s.ListenChan
-		stream.Send(res)
+	worker := registryWoker{
+		ID:      in.ID,
+		Kind:    in.Kind,
+		OS:      in.OS,
+		Arch:    in.Arch,
+		Kernel:  in.Kernel,
+		Channel: make(chan *pkg.ListenResponse),
 	}
-	return nil
+	s.Workers = append(s.Workers, worker)
+
+	// Start a ticker that executes each 5 seconds
+	timer := time.NewTicker(5 * time.Second)
+	result := &pkg.ListenResponse{}
+	for {
+		select {
+		// Exit on stream context done
+		case <-stream.Context().Done():
+			return nil
+		case <-timer.C:
+			// Grab stats and output
+			result = &pkg.ListenResponse{
+				Action: pkg.Action_GetServices,
+			}
+			err := stream.Send(result)
+			if err != nil {
+				return err
+			}
+		case <-worker.Channel:
+			result = &pkg.ListenResponse{
+				Action: pkg.Action_GetServices,
+			}
+			err := stream.Send(result)
+			if err != nil {
+				return err
+			}
+		}
+	}
 }
 
 // GetServices implements sdk.RegistryServer.
 func (s *RegistryServer) GetServices(ctx context.Context, in *pkg.GetServicesRequest) (*pkg.GetServicesResponse, error) {
-	return nil, nil
+	result := &pkg.GetServicesResponse{}
+	worker := conf.Server.GetWorkerByID(in.ID)
+	if worker != nil {
+		if len(worker.Agents) > 0 {
+			result.AgentServices = make([]*pkg.ServiceConfig, len(worker.Agents))
+			for k, agent := range worker.Agents {
+				if len(agent.Services) > 0 {
+					result.AgentServices[k] = &pkg.ServiceConfig{
+						Server_Address: conf.Host,
+						Server_Port:    strconv.Itoa(conf.Port),
+						User:           agent.User,
+						Token:          conf.Message.Token,
+						Services:       make(map[string]*pkg.SecretService),
+					}
+					for _, service := range agent.Services {
+						result.AgentServices[k].Services[service.Name] = &pkg.SecretService{
+							Type:   service.Type,
+							Name:   service.Name,
+							Secret: service.SK,
+							Host:   service.Local_IP,
+							Port:   service.Local_Port,
+						}
+					}
+				}
+			}
+		}
+		if len(worker.Visitors) > 0 {
+			result.VisitorServices = make([]*pkg.ServiceConfig, len(worker.Visitors))
+			for k, visitor := range worker.Visitors {
+				if len(visitor.Services) > 0 {
+					result.AgentServices[k] = &pkg.ServiceConfig{
+						Server_Address: conf.Host,
+						Server_Port:    strconv.Itoa(conf.Port),
+						User:           visitor.User,
+						Token:          conf.Message.Token,
+						Services:       make(map[string]*pkg.SecretService),
+					}
+					for _, service := range visitor.Services {
+						result.AgentServices[k].Services[service.Name] = &pkg.SecretService{
+							Type:   service.Type,
+							Name:   service.Name,
+							Secret: service.SK,
+							Host:   service.Bind_Addr,
+							Port:   service.Bind_Port,
+						}
+					}
+				}
+			}
+		}
+	}
+	return result, nil
 }
 
 type registryWoker struct {
-	kind    string
-	os      string
-	arch    string
-	kernel  string
-	variant string
-	labels  map[string]string
-	channel chan *pkg.ListenResponse
+	ID        string
+	Kind      pkg.Kind
+	OS        string
+	Arch      string
+	Kernel    string
+	Labels    map[string]string
+	LoginTime metav1.Time
+	Channel   chan *pkg.ListenResponse
 }

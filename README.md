@@ -6,9 +6,9 @@
 
 | 端口 | 协议      | 用途       | URL                    |
 | ---- | --------- | ---------- | ---------------------- |
-| 81 | h2c       | grpc 服务  | /awecloud/bmq/registry |
-| 82 | websocket | 消息服务   | /awecloud/bmq/message  |
-| 83 | http      | 控制台服务 | /awecloud/bmq/api      |
+| 81   | h2c       | grpc 服务  | /awecloud/bmq/registry |
+| 82   | websocket | 消息服务   | /awecloud/bmq/message  |
+| 83   | http      | 控制台服务 | /awecloud/bmq/api      |
 
 ## grpc 服务
 

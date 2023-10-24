@@ -18,9 +18,9 @@ func NewAPIServer() *http.Server {
 	// load gin router
 	r := gin.New()
 	loadAPIRouter(r, log.GinLogger(), log.GinRecovery(true))
-	conf.Logger.Info("server is starting...", zap.Int("port", conf.APIPort))
+	conf.Logger.Info("server is starting...", zap.Int("port", conf.API.Port))
 	return &http.Server{
-		Addr:    fmt.Sprintf(":%d", conf.APIPort),
+		Addr:    fmt.Sprintf(":%d", conf.API.Port),
 		Handler: r,
 		// ReadTimeout:    30 * time.Second,
 		// WriteTimeout:   30 * time.Second,
