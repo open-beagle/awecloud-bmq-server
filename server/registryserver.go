@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/open-beagle/awecloud-bmq-sdk/pkg"
 	"github.com/open-beagle/awecloud-bmq-server/pkg/conf"
+	"github.com/open-beagle/awecloud-bmq-server/pkg/data"
 )
 
 func NewRegistryServer() {
@@ -21,9 +21,7 @@ func NewRegistryServer() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
-	pkg.RegisterRegistryServer(s, &RegistryServer{
-		Workers: make([]registryWoker, 0),
-	})
+	pkg.RegisterRegistryServer(s, &RegistryServer{})
 	log.Printf("grpc server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
@@ -33,46 +31,39 @@ func NewRegistryServer() {
 // RegistryServer is used to implement sdk.RegistryServer.
 type RegistryServer struct {
 	pkg.UnimplementedRegistryServer
-	Workers []registryWoker
 }
 
 // Login implements sdk.RegistryServer.
 func (s *RegistryServer) Login(ctx context.Context, in *pkg.LoginRequest) (*pkg.LoginResponse, error) {
-	if conf.Server != nil && len(conf.Server.Workers) > 0 {
-		for _, k := range conf.Server.Workers {
-			if k.ID == in.ID {
-				if k.Secret == in.Secret {
-					return &pkg.LoginResponse{
-						Path:   conf.Message.Prefix,
-						Secret: conf.Message.Token,
-					}, nil
-				} else {
-					return nil, errors.New("error : Secret mismatch")
-				}
-			}
-		}
+	worker := conf.Server.GetWorker(in.ID)
+	if worker == nil {
+		return nil, errors.New("error : Worker do not exist.")
 	}
-	return nil, errors.New("error : ID or Secret mismatch")
+	if worker.Secret == in.Secret {
+		return &pkg.LoginResponse{
+			Path:   conf.Message.Prefix,
+			Secret: conf.Message.Token,
+		}, nil
+	}
+	return nil, errors.New("error : Worker Secret mismatch")
 }
 
 // Listen implements sdk.RegistryServer.
 func (s *RegistryServer) Listen(in *pkg.ListenRequest, stream pkg.Registry_ListenServer) error {
-	worker := registryWoker{
-		ID:      in.ID,
-		Kind:    in.Kind,
-		OS:      in.OS,
-		Arch:    in.Arch,
-		Kernel:  in.Kernel,
-		Channel: make(chan *pkg.ListenResponse),
+	worker := &data.OnlineWoker{
+		ID:     in.ID,
+		Kind:   in.Kind,
+		OS:     in.OS,
+		Arch:   in.Arch,
+		Kernel: in.Kernel,
 	}
-	s.Workers = append(s.Workers, worker)
+	data.Server.SetWorker(worker)
 
 	// Start a ticker that executes each 5 seconds
 	timer := time.NewTicker(5 * time.Second)
 	result := &pkg.ListenResponse{}
 	for {
 		select {
-		// Exit on stream context done
 		case <-stream.Context().Done():
 			return nil
 		case <-timer.C:
@@ -99,7 +90,7 @@ func (s *RegistryServer) Listen(in *pkg.ListenRequest, stream pkg.Registry_Liste
 // GetServices implements sdk.RegistryServer.
 func (s *RegistryServer) GetServices(ctx context.Context, in *pkg.GetServicesRequest) (*pkg.GetServicesResponse, error) {
 	result := &pkg.GetServicesResponse{}
-	worker := conf.Server.GetWorkerByID(in.ID)
+	worker := conf.Server.GetWorker(in.ID)
 	if worker != nil {
 		if len(worker.Agents) > 0 {
 			result.AgentServices = make([]*pkg.ServiceConfig, len(worker.Agents))
@@ -149,15 +140,4 @@ func (s *RegistryServer) GetServices(ctx context.Context, in *pkg.GetServicesReq
 		}
 	}
 	return result, nil
-}
-
-type registryWoker struct {
-	ID        string
-	Kind      pkg.Kind
-	OS        string
-	Arch      string
-	Kernel    string
-	Labels    map[string]string
-	LoginTime metav1.Time
-	Channel   chan *pkg.ListenResponse
 }

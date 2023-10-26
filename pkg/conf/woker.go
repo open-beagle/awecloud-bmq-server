@@ -5,15 +5,16 @@ import (
 )
 
 type Worker struct {
-	ID         string
-	Secret     string
-	Alias      string
-	CreateTime metav1.Time
-	Agents     []WorkerAgent
-	Visitors   []WorkerVisitor
+	ID       string
+	Secret   string
+	Alias    string
+	Create   metav1.Time
+	CreateBy string
+	Agents   []WorkerAgent
+	Visitors []WorkerVisitor
 }
 
-type Session struct {
+type WorkerSession struct {
 	ID        string
 	User      string
 	Alias     string
@@ -27,11 +28,12 @@ type Session struct {
 }
 
 type WorkerAgent struct {
-	Name       string
-	Alias      string
-	User       string
-	CreateTime metav1.Time
-	Services   []WorkerAgentService
+	Name     string
+	Alias    string
+	User     string
+	Create   metav1.Time
+	CreateBy string
+	Services []WorkerAgentService
 }
 
 type WorkerAgentService struct {
@@ -40,15 +42,17 @@ type WorkerAgentService struct {
 	SK         string
 	Local_IP   string
 	Local_Port int32
-	CreateTime metav1.Time
+	Create     metav1.Time
+	CreateBy   string
 }
 
 type WorkerVisitor struct {
-	Name       string
-	Alias      string
-	User       string
-	CreateTime metav1.Time
-	Services   []WorkerVisitorService
+	Name     string
+	Alias    string
+	User     string
+	Create   metav1.Time
+	CreateBy string
+	Services []WorkerVisitorService
 }
 
 type WorkerVisitorService struct {
@@ -59,5 +63,6 @@ type WorkerVisitorService struct {
 	SK          string
 	Bind_Addr   string
 	Bind_Port   int32
-	CreateTime  metav1.Time
+	Create      metav1.Time
+	CreateBy    string
 }

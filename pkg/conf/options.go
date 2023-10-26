@@ -11,13 +11,17 @@ var (
 )
 
 type apiConfig struct {
-	Port   int
-	Prefix string
+	Port          int
+	Prefix        string
+	CaptchaWidth  int
+	CaptchaHeight int
 }
 
 var API = &apiConfig{
-	Port:   83,
-	Prefix: "/awecloud/bmq/api",
+	Port:          83,
+	Prefix:        "/awecloud/bmq/api",
+	CaptchaWidth:  240,
+	CaptchaHeight: 60,
 }
 
 type grpcConfig struct {
@@ -39,5 +43,3 @@ var Message = &messageConfig{
 	Token:  "bmq",
 	Prefix: "/awecloud/bmq/message",
 }
-
-var Server = &ServerConfig{}
